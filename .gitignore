@@ -4,3 +4,9 @@ __pycache__
 *egg-info
 *.pyc
 */pycache
+.env
+x86_venv
+miniforge.sh
+.DS_Store
+MUJOCO_LOG.TXT
+mjkey.txt

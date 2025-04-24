@@ -12,7 +12,10 @@ import gym
 try:
     import mujoco_py
 except ImportError as e:
+    print("ERROR!!: ")
+    print(e)
     raise error.DependencyNotInstalled("You need to install mujoco_py (https://mujoco.org/)")
+    
 
 DEFAULT_SIZE = 500
 
@@ -124,7 +127,7 @@ class MujocoEnv(gym.Env):
             self.sim.step()
 
     def render(self,
-               mode='human',
+               mode='rgb_array',
                width=DEFAULT_SIZE,
                height=DEFAULT_SIZE,
                camera_id=None,
