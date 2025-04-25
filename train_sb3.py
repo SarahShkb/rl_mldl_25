@@ -12,6 +12,9 @@ def main():
     try:
         train_env = gym.make('CustomHopper-source-v0')
 
+        print('Number of degrees of freedom (DoFs) of the robot:', train_env.sim.model.nv)
+        print('Number of DoFs for each body:', train_env.sim.model.body_dofnum)
+        print('Number of actuators:', train_env.sim.model.nu)
         print('body massses:', train_env.sim.model.body_mass)
         print('State space:', train_env.observation_space)  # state-space
         print('Action space:', train_env.action_space)  # action-space

@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.distributions import Normal
+import gym
+from env.custom_hopper import *
 
 
 def discount_rewards(r, gamma):
@@ -83,7 +85,8 @@ class Agent(object):
         self.action_log_probs = []
         self.rewards = []
         self.done = []
-
+   
+    
 
     def update_policy(self):
         action_log_probs = torch.stack(self.action_log_probs, dim=0).to(self.train_device).squeeze(-1)
@@ -100,6 +103,9 @@ class Agent(object):
         #   - compute policy gradient loss function given actions and returns
         #   - compute gradients and step the optimizer
         #
+        # TODO: pass env outside of class
+        env = gym.make('CustomHopper-source-v0')
+        self.REINFORCE(self, env, 500)
 
 
         #
@@ -110,7 +116,42 @@ class Agent(object):
         #   - compute gradients and step the optimizer
         #
 
-        return        
+        return  
+
+
+    def REINFORCE(self,env,T):
+        done = False
+        state = env.reset()	# Reset environment to initial state
+        episode_reward = 0
+        
+        #generate a trajectory for a single episode
+        while not done:  # Until the episode is over
+
+            distribution = torch.distributions.Categorical(self.policy)  
+            action = distribution.sample()                        
+            action_log_prob = distribution.log_prob(action)              
+            state, reward, done, = env.step(action_log_prob)	
+            episode_reward += reward
+            self.action_log_probs.append(action_log_prob)
+            self.states.append(torch.from_numpy(state).float())
+        
+        for t in range(T):
+            # Compute discounted returns
+            Gt = 0
+            for k in range(t+1, T):
+                Gt += (self.gamma ** (k-t-1)) * self.rewards[t]
+            self.rewards[t] = Gt
+
+
+        self.optimizer.zero_grad()  
+        loss = 0
+        for log_prob, Gt in zip(self.action_log_probs, self.rewards):
+            loss += -log_prob * Gt 
+
+        loss.backward()           
+        self.optimizer.step()       
+
+        return list(self.policy.parameters())      
 
 
     def get_action(self, state, evaluation=False):
