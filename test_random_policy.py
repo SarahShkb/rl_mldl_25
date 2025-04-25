@@ -23,25 +23,31 @@ def main():
 	env = gym.make('CustomHopper-source-v0')
 	# env = gym.make('CustomHopper-target-v0')
 
+	print('body massses:', env.sim.model.body_mass)
 	print('State space:', env.observation_space) # state-space
 	print('Action space:', env.action_space) # action-space
 	print('Dynamics parameters:', env.get_parameters()) # masses of each link of the Hopper
 
 	n_episodes = 500
-	render = True
+	render = False
 
 	for episode in range(n_episodes):
 		done = False
 		state = env.reset()	# Reset environment to initial state
+		total_reward = 0
 
 		while not done:  # Until the episode is over
 
 			action = env.action_space.sample()	# Sample random action
 		
 			state, reward, done, info = env.step(action)	# Step the simulator to the next timestep
+			total_reward += reward
 
 			if render:
 				env.render()
+
+
+		print(f"Episode {episode + 1}: Total reward = {total_reward:.2f}")
 
 	
 

@@ -2,8 +2,19 @@ FROM python:3.8-buster
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx libgl1-mesa-dri libosmesa6 \
+    libxext6 libxrender1 libsm6 libglfw3 \
+    x11-utils mesa-utils \
+    curl git unzip gcc g++ \
+    libglew-dev libglfw3-dev \
+    patchelf python3-opengl \
+    ffmpeg \
     libgl1-mesa-glx \
+    libxrender1 \
+    libsm6 \
+    libxext6 \
     libglfw3 \
+    x11-utils \
     libosmesa6-dev \
     patchelf \
     git \
@@ -30,7 +41,6 @@ ENV MUJOCO_VERSION=2.1.1
 ENV MUJOCO_DIR=/root/.mujoco/mujoco-2.1.1
 ENV MUJOCO_PY_MUJOCO_PATH=${MUJOCO_DIR}
 ENV LD_LIBRARY_PATH=/root/.mujoco/mujoco-2.1.1/bin:/usr/lib/x86_64-linux-gnu:/usr/lib
-ENV MUJOCO_GL=disable
 
 # Set up MuJoCo directory (v2.1.1)
 RUN mkdir -p /root/.mujoco && \
