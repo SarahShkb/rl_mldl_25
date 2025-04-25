@@ -45,27 +45,30 @@ def main():
     #
 
 	for episode in range(args.n_episodes):
-		done = False
-		train_reward = 0
-		state = env.reset()  # Reset the environment and observe the initial state
+		reward = agent.update_policy(env)
+		print('reward for episode:', episode , ":", reward)
+	# 	done = False
+	# 	train_reward = 0
+	# 	state = env.reset()  # Reset the environment and observe the initial state
 
-		while not done:  # Loop until the episode is over
+	# 	while not done:  # Loop until the episode is over
 
-			action, action_probabilities = agent.get_action(state)
-			previous_state = state
+	# 		action, action_probabilities = agent.get_action(state)
+	# 		previous_state = state
 
-			state, reward, done, info = env.step(action.detach().cpu().numpy())
+	# 		state, reward, done, info = env.step(action.detach().cpu().numpy())
 
-			agent.store_outcome(previous_state, state, action_probabilities, reward, done)
+	# 		agent.store_outcome(previous_state, state, action_probabilities, reward, done)
 
-			train_reward += reward
+	# 		train_reward += reward
 		
-		if (episode+1)%args.print_every == 0:
-			print('Training episode:', episode)
-			print('Episode return:', train_reward)
+	# 	if (episode+1)%args.print_every == 0:
+	# 		print('Training episode:', episode)
+	# 		print('Episode return:', train_reward)
 
 
-	torch.save(agent.policy.state_dict(), "model.mdl")
+
+	#torch.save(agent.policy.state_dict(), "model.mdl")
 
 	
 

@@ -88,12 +88,12 @@ class Agent(object):
    
     
 
-    def update_policy(self):
-        action_log_probs = torch.stack(self.action_log_probs, dim=0).to(self.train_device).squeeze(-1)
-        states = torch.stack(self.states, dim=0).to(self.train_device).squeeze(-1)
-        next_states = torch.stack(self.next_states, dim=0).to(self.train_device).squeeze(-1)
-        rewards = torch.stack(self.rewards, dim=0).to(self.train_device).squeeze(-1)
-        done = torch.Tensor(self.done).to(self.train_device)
+    def update_policy(self, env):
+        # action_log_probs = torch.stack(self.action_log_probs, dim=0).to(self.train_device).squeeze(-1)
+        # states = torch.stack(self.states, dim=0).to(self.train_device).squeeze(-1)
+        # next_states = torch.stack(self.next_states, dim=0).to(self.train_device).squeeze(-1)
+        # rewards = torch.stack(self.rewards, dim=0).to(self.train_device).squeeze(-1)
+        # done = torch.Tensor(self.done).to(self.train_device)
 
         self.states, self.next_states, self.action_log_probs, self.rewards, self.done = [], [], [], [], []
 
@@ -103,9 +103,7 @@ class Agent(object):
         #   - compute policy gradient loss function given actions and returns
         #   - compute gradients and step the optimizer
         #
-        # TODO: pass env outside of class
-        env = gym.make('CustomHopper-source-v0')
-        self.REINFORCE(self, env, 500)
+        reward = self.REINFORCE(env, maxSteps=1000)  # Call the REINFORCE method to update the policy
 
 
         #
@@ -116,42 +114,48 @@ class Agent(object):
         #   - compute gradients and step the optimizer
         #
 
-        return  
+        return reward
 
 
-    def REINFORCE(self,env,T):
+    def REINFORCE(self,env,maxSteps):
         done = False
         state = env.reset()	# Reset environment to initial state
+        steps = 0
         episode_reward = 0
         
         #generate a trajectory for a single episode
-        while not done:  # Until the episode is over
+        while not done and steps < maxSteps:  # Until the episode is over
 
-            distribution = torch.distributions.Categorical(self.policy)  
-            action = distribution.sample()                        
-            action_log_prob = distribution.log_prob(action)              
-            state, reward, done, = env.step(action_log_prob)	
+            state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.train_device)
+            distribution = self.policy(state_tensor) 
+
+            action = distribution.sample()
+            action_log_prob = distribution.log_prob(action).sum()  # Sum across dimensions if multidimensional
+
+            next_state, reward, done, _ = env.step(action.cpu().numpy())  # Send tensor to numpy
+
             episode_reward += reward
+            self.states.append(state_tensor.squeeze(0))
             self.action_log_probs.append(action_log_prob)
-            self.states.append(torch.from_numpy(state).float())
-        
-        for t in range(T):
-            # Compute discounted returns
-            Gt = 0
-            for k in range(t+1, T):
-                Gt += (self.gamma ** (k-t-1)) * self.rewards[t]
-            self.rewards[t] = Gt
+            self.rewards.append(torch.tensor([reward], dtype=torch.float32).to(self.train_device))
+            state = next_state
+
+        returns = []
+        G = 0
+        for r in reversed(self.rewards):
+            G = r + self.gamma * G
+            returns.insert(0, G)
 
 
         self.optimizer.zero_grad()  
         loss = 0
-        for log_prob, Gt in zip(self.action_log_probs, self.rewards):
+        for log_prob, Gt in zip(self.action_log_probs, returns):
             loss += -log_prob * Gt 
 
         loss.backward()           
         self.optimizer.step()       
 
-        return list(self.policy.parameters())      
+        return episode_reward     
 
 
     def get_action(self, state, evaluation=False):
