@@ -103,7 +103,7 @@ class Agent(object):
         #   - compute policy gradient loss function given actions and returns
         #   - compute gradients and step the optimizer
         #
-        reward = self.REINFORCE(env, maxSteps=1000)  # Call the REINFORCE method to update the policy
+        reward = self.REINFORCE(env, maxSteps=1000, baseline=20)  # Call the REINFORCE method to update the policy
 
 
         #
@@ -117,7 +117,7 @@ class Agent(object):
         return reward
 
 
-    def REINFORCE(self,env,maxSteps):
+    def REINFORCE(self,env,maxSteps, baseline):
         done = False
         state = env.reset()	# Reset environment to initial state
         steps = 0
@@ -145,6 +145,8 @@ class Agent(object):
         for r in reversed(self.rewards):
             G = r + self.gamma * G
             returns.insert(0, G)
+
+        returns = [Gt - baseline for Gt in returns]
 
 
         self.optimizer.zero_grad()  
