@@ -40,10 +40,11 @@ class Policy(torch.nn.Module):
             Critic network
         """
         # TASK 3: critic network for actor-critic algorithm
-        # I decided to use action-value function (Q-function) as critic
-        self.fc1_critic = torch.nn.Linear(state_space + action_space, self.hidden)
+        # I decided to use action-value function (Q-function) as critic at first,
+        # but it didn't work well, so I changed it to state-value function (V-function)
+        self.fc1_critic = torch.nn.Linear(state_space, self.hidden)  
         self.fc2_critic = torch.nn.Linear(self.hidden, self.hidden)
-        self.fc3_critic_q_value = torch.nn.Linear(self.hidden, 1)
+        self.fc3_critic_value = torch.nn.Linear(self.hidden, 1)  
 
 
         self.init_weights()
@@ -70,18 +71,15 @@ class Policy(torch.nn.Module):
         return normal_dist
     
 
-    def critic_forward(self, x, y):
-        # x is the state, y is the action
+    def critic_forward(self, x):
         """
-            Critic
+            Critic: now takes only state
         """
-        # TASK 3: forward in the critic network
-        state_action = torch.cat([x, y], dim=-1)
-        q = self.tanh(self.fc1_critic(state_action))
-        q = self.tanh(self.fc2_critic(q))
-        q_value = self.fc3_critic_q_value(q)
+        v = self.tanh(self.fc1_critic(x))
+        v = self.tanh(self.fc2_critic(v))
+        v_value = self.fc3_critic_value(v)
 
-        return q_value
+        return v_value
 
 
 class Agent(object):
@@ -96,7 +94,7 @@ class Agent(object):
             [self.policy.sigma]  
         self.critic_params = list(self.policy.fc1_critic.parameters()) + \
                 list(self.policy.fc2_critic.parameters()) + \
-                list(self.policy.fc3_critic_q_value.parameters())
+                list(self.policy.fc3_critic_value.parameters())
         
         self.optimizer_critic = torch.optim.Adam(self.critic_params, lr=1e-3)
         self.optimizer_actor = torch.optim.Adam(self.actor_params, lr=1e-3)
@@ -117,7 +115,7 @@ class Agent(object):
         # rewards = torch.stack(self.rewards, dim=0).to(self.train_device).squeeze(-1)
         # done = torch.Tensor(self.done).to(self.train_device)
 
-        self.states, self.next_states, self.action_log_probs, self.rewards, self.done = [], [], [], [], []
+        self.states, self.next_states, self.action_log_probs, self.actions, self.values, self.rewards, self.done = [], [], [], [], [], [], []
 
         #
         # TASK 2:
@@ -185,49 +183,67 @@ class Agent(object):
 
     def ActorCritic(self, env, maxSteps):
         done = False
-        state = env.reset()	# Reset environment to initial state
+        state = env.reset()
         steps = 0
         episode_reward = 0
-        
+
         while not done and steps < maxSteps:
-            # sample action from the policy pi
             state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.train_device)
-            distribution = self.policy(state_tensor) 
-
+            distribution = self.policy(state_tensor)
             action = distribution.sample()
-            action_log_prob = distribution.log_prob(action).sum()  # Sum across dimensions if multidimensional
+            action_log_prob = distribution.log_prob(action).sum()
 
-            Q_s_a = self.policy.critic_forward(state_tensor, action)  # Q-value for the current state-action pair
+            V_s = self.policy.critic_forward(state_tensor)
 
-            next_state, reward, done, _ = env.step(action.cpu().numpy())  # Send tensor to numpy
+            next_state, reward, done, _ = env.step(action.cpu().numpy())
 
-            # computing TD error (Advantage)
-            next_state_tensor = torch.FloatTensor(next_state).unsqueeze(0).to(self.train_device)
-            next_distribution = self.policy(next_state_tensor)
-            next_action = next_distribution.sample()
-            Q_s_a_next = self.policy.critic_forward(next_state_tensor, next_action)
-            # TD error
-            target = reward + self.gamma * Q_s_a_next.detach()
-            delta = target - Q_s_a  # Q_s_a still connected to critic network  
-
-
-            # update theta (actor parameters)
-            actor_loss = -Q_s_a.detach() * action_log_prob  # Negative because we want to maximize
-            self.optimizer_actor.zero_grad()
-            actor_loss.backward()
-            self.optimizer_actor.step()
-
-
-
-            # update weights of the critic network (w)
-            critic_loss = delta.pow(2)  # MSE loss
-            self.optimizer_critic.zero_grad()
-            critic_loss.backward()  # retain_graph=True to keep the graph for the actor update
-            self.optimizer_critic.step()
+            # Store the outcome
+            self.states.append(state_tensor)
+            self.actions.append(action)
+            self.action_log_probs.append(action_log_prob)
+            self.rewards.append(reward)
+            self.done.append(done)
+            self.values.append(V_s)
 
             state = next_state
             steps += 1
             episode_reward += reward
+
+
+        next_state_tensor = torch.FloatTensor(next_state).unsqueeze(0).to(self.train_device)
+        V_s_next = self.policy.critic_forward(next_state_tensor).detach()
+
+        # first, normalize the rewards
+        rewards = np.array(self.rewards)
+        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-8)
+        self.rewards = rewards.tolist()
+
+        returns = []
+        R = V_s_next
+        for r, d in zip(reversed(self.rewards), reversed(self.done)):
+            R = r + self.gamma * R * (1-d)
+            returns.insert(0, R)
+        
+        returns_tensor = torch.FloatTensor(returns).unsqueeze(1).to(self.train_device)
+        values_tensor = torch.cat(self.values)
+
+        # delta (Advantage)
+        delta = returns_tensor - values_tensor
+        delta = (delta - delta.mean()) / (delta.std() + 1e-8)
+
+        # Actor loss: policy gradient
+        actor_log_probs_tensor = torch.stack(self.action_log_probs).to(self.train_device)
+        # Actor loss (policy gradient with advantage)
+        actor_loss = -(actor_log_probs_tensor * delta.detach()).mean()
+        self.optimizer_actor.zero_grad()
+        actor_loss.backward()
+        self.optimizer_actor.step()
+
+        # Critic loss: regression to target
+        critic_loss = delta.pow(2).mean()
+        self.optimizer_critic.zero_grad()
+        critic_loss.backward()
+        self.optimizer_critic.step()
 
         return episode_reward
 
