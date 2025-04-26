@@ -40,6 +40,10 @@ class Policy(torch.nn.Module):
             Critic network
         """
         # TASK 3: critic network for actor-critic algorithm
+        # I decided to use action-value function (Q-function) as critic
+        self.fc1_critic = torch.nn.Linear(state_space + action_space, self.hidden)
+        self.fc2_critic = torch.nn.Linear(self.hidden, self.hidden)
+        self.fc3_critic_q_value = torch.nn.Linear(self.hidden, 1)
 
 
         self.init_weights()
@@ -63,14 +67,21 @@ class Policy(torch.nn.Module):
         sigma = self.sigma_activation(self.sigma)
         normal_dist = Normal(action_mean, sigma)
 
+        return normal_dist
+    
 
+    def critic_forward(self, x, y):
+        # x is the state, y is the action
         """
             Critic
         """
         # TASK 3: forward in the critic network
+        state_action = torch.cat([x, y], dim=-1)
+        q = self.tanh(self.fc1_critic(state_action))
+        q = self.tanh(self.fc2_critic(q))
+        q_value = self.fc3_critic_q_value(q)
 
-        
-        return normal_dist
+        return q_value
 
 
 class Agent(object):
@@ -78,6 +89,17 @@ class Agent(object):
         self.train_device = device
         self.policy = policy.to(self.train_device)
         self.optimizer = torch.optim.Adam(policy.parameters(), lr=1e-3)
+
+        self.actor_params = list(self.policy.fc1_actor.parameters()) + \
+            list(self.policy.fc2_actor.parameters()) + \
+            list(self.policy.fc3_actor_mean.parameters()) + \
+            [self.policy.sigma]  
+        self.critic_params = list(self.policy.fc1_critic.parameters()) + \
+                list(self.policy.fc2_critic.parameters()) + \
+                list(self.policy.fc3_critic_q_value.parameters())
+        
+        self.optimizer_critic = torch.optim.Adam(self.critic_params, lr=1e-3)
+        self.optimizer_actor = torch.optim.Adam(self.actor_params, lr=1e-3)
 
         self.gamma = 0.99
         self.states = []
@@ -103,7 +125,7 @@ class Agent(object):
         #   - compute policy gradient loss function given actions and returns
         #   - compute gradients and step the optimizer
         #
-        reward = self.REINFORCE(env, maxSteps=1000, baseline=20)  # Call the REINFORCE method to update the policy
+        # reward_reinforce = self.REINFORCE(env, maxSteps=1000, baseline=20)  # Call the REINFORCE method to update the policy
 
 
         #
@@ -113,8 +135,9 @@ class Agent(object):
         #   - compute actor loss and critic loss
         #   - compute gradients and step the optimizer
         #
+        reward_actorCritic = self.ActorCritic(env, maxSteps=10000)  # Call the ActorCritic method to update the policy
 
-        return reward
+        return reward_actorCritic
 
 
     def REINFORCE(self,env,maxSteps, baseline):
@@ -160,11 +183,61 @@ class Agent(object):
         return episode_reward     
 
 
+    def ActorCritic(self, env, maxSteps):
+        done = False
+        state = env.reset()	# Reset environment to initial state
+        steps = 0
+        episode_reward = 0
+        
+        while not done and steps < maxSteps:
+            # sample action from the policy pi
+            state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.train_device)
+            distribution = self.policy(state_tensor) 
+
+            action = distribution.sample()
+            action_log_prob = distribution.log_prob(action).sum()  # Sum across dimensions if multidimensional
+
+            Q_s_a = self.policy.critic_forward(state_tensor, action)  # Q-value for the current state-action pair
+
+            next_state, reward, done, _ = env.step(action.cpu().numpy())  # Send tensor to numpy
+
+            # computing TD error (Advantage)
+            next_state_tensor = torch.FloatTensor(next_state).unsqueeze(0).to(self.train_device)
+            next_distribution = self.policy(next_state_tensor)
+            next_action = next_distribution.sample()
+            Q_s_a_next = self.policy.critic_forward(next_state_tensor, next_action)
+            # TD error
+            target = reward + self.gamma * Q_s_a_next.detach()
+            delta = target - Q_s_a  # Q_s_a still connected to critic network  
+
+
+            # update theta (actor parameters)
+            actor_loss = -Q_s_a.detach() * action_log_prob  # Negative because we want to maximize
+            self.optimizer_actor.zero_grad()
+            actor_loss.backward()
+            self.optimizer_actor.step()
+
+
+
+            # update weights of the critic network (w)
+            critic_loss = delta.pow(2)  # MSE loss
+            self.optimizer_critic.zero_grad()
+            critic_loss.backward()  # retain_graph=True to keep the graph for the actor update
+            self.optimizer_critic.step()
+
+            state = next_state
+            steps += 1
+            episode_reward += reward
+
+        return episode_reward
+
+
+
     def get_action(self, state, evaluation=False):
         """ state -> action (3-d), action_log_densities """
         x = torch.from_numpy(state).float().to(self.train_device)
 
-        normal_dist = self.policy(x)
+        normal_dist = self.policy(x).normal_dist
 
         if evaluation:  # Return mean
             return normal_dist.mean, None
