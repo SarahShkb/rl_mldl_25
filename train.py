@@ -46,16 +46,16 @@ def main():
     # TASK 2 and 3: interleave data collection to policy updates
     #
 
-	reward_list_reinforce = []
-	save_path = "/content/drive/MyDrive/reinforce_rewards.pkl"
+	reward_list_actor_critic = []
+	save_path = "/content/drive/MyDrive/reward_list_actor_critic_rewards.pkl"
 
-	for episode in range(args.n_episodes):
-		reward1 = agent.update_policy(env)
-		print(f"Episode {episode} - REINFORCE: {reward1}")
-		reward_list_reinforce.append(reward1)
+	for episode in range(10000):
+		reward2 = agent.update_policy(env)
+		print(f"Episode {episode} - ACTOR_CRITIC: {reward2}")
+		reward_list_actor_critic.append(reward2)
 		
 		with open(save_path, 'wb') as f:
-			pickle.dump(reward_list_reinforce, f)
+			pickle.dump(reward_list_actor_critic, f)
 	# 	done = False
 	# 	train_reward = 0
 	# 	state = env.reset()  # Reset the environment and observe the initial state
