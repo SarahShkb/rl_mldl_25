@@ -2,9 +2,11 @@
     REINFORCE and Actor-critic algorithms
 """
 import argparse
+import matplotlib.pyplot as plt
 
 import torch
 import gym
+import pickle
 
 from env.custom_hopper import *
 from agent import Agent, Policy
@@ -44,9 +46,12 @@ def main():
     # TASK 2 and 3: interleave data collection to policy updates
     #
 
+	reward_list_reinforce = []
+
 	for episode in range(args.n_episodes):
-		reward = agent.update_policy(env)
-		print('reward for episode:', episode , ":", reward)
+		reward1 = agent.update_policy(env)
+		print(f"Episode {episode} - REINFORCE: {reward1}")
+		reward_list_reinforce.append(reward1)
 	# 	done = False
 	# 	train_reward = 0
 	# 	state = env.reset()  # Reset the environment and observe the initial state
@@ -67,6 +72,11 @@ def main():
 	# 		print('Episode return:', train_reward)
 
 
+	# Save with pickle
+	with open('rewards.pkl', 'wb') as f:
+		pickle.dump({
+			'reinforce': reward_list_reinforce
+		}, f)
 
 	#torch.save(agent.policy.state_dict(), "model.mdl")
 
