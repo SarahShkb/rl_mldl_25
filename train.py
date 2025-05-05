@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import torch
 import gym
 import pickle
+import os
 
 from env.custom_hopper import *
 from agent import Agent, Policy
@@ -45,17 +46,33 @@ def main():
     #
     # TASK 2 and 3: interleave data collection to policy updates
     #
+	save_dir = "/content/drive/MyDrive/rl_logs"
+	os.makedirs(save_dir, exist_ok=True)
 
-	reward_list_actor_critic = []
-	save_path = "/content/drive/MyDrive/reward_list_actor_critic_rewards.pkl"
+	# File to save both reward histories
+	save_path = os.path.join(save_dir, "reward_history.pkl")
+
+	# Initialize or load rewards
+	if os.path.exists(save_path):
+		with open(save_path, 'rb') as f:
+			reward_data = pickle.load(f)
+			rewards_reinforce = reward_data.get('reinforce', [])
+			rewards_actor_critic = reward_data.get('actor_critic', [])
+	else:
+		rewards_reinforce = []
+		rewards_actor_critic = []
 
 	for episode in range(10000):
-		reward2 = agent.update_policy(env)
-		print(f"Episode {episode} - ACTOR_CRITIC: {reward2}")
-		reward_list_actor_critic.append(reward2)
+		reward1, reward2 = agent.update_policy(env)
+		print(f"Episode {episode} - REINFORCE: {reward1} , ACTOR_CRITIC: {reward2}")
+		rewards_reinforce.append(reward_reinforce)
+		rewards_actor_critic.append(reward_actor_critic)
 		
 		with open(save_path, 'wb') as f:
-			pickle.dump(reward_list_actor_critic, f)
+			pickle.dump({
+                'reinforce': rewards_reinforce,
+                'actor_critic': rewards_actor_critic
+            }, f)
 	# 	done = False
 	# 	train_reward = 0
 	# 	state = env.reset()  # Reset the environment and observe the initial state

@@ -125,7 +125,7 @@ class Agent(object):
         #
         reward_reinforce = self.REINFORCE(env, maxSteps=1000000, baseline=20)  # Call the REINFORCE method to update the policy
 
-        # self.states, self.next_states, self.action_log_probs, self.actions, self.values, self.rewards, self.done = [], [], [], [], [], [], []
+        self.states, self.next_states, self.action_log_probs, self.actions, self.values, self.rewards, self.done = [], [], [], [], [], [], []
 
         #
         # TASK 3:
@@ -134,10 +134,10 @@ class Agent(object):
         #   - compute actor loss and critic loss
         #   - compute gradients and step the optimizer
         #
-        #reward_actorCritic = self.ActorCritic(env, maxSteps=1000000)  # Call the ActorCritic method to update the policy
+        reward_actorCritic = self.ActorCritic(env, maxSteps=1000000)  # Call the ActorCritic method to update the policy
 
-        #return reward_reinforce, reward_actorCritic
-        return reward_reinforce
+        return reward_reinforce, reward_actorCritic
+        #return reward_reinforce
 
 
     def REINFORCE(self,env,maxSteps, baseline):
