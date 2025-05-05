@@ -62,7 +62,7 @@ def main():
 		rewards_reinforce = []
 		rewards_actor_critic = []
 
-	for episode in range(100000):
+	for episode in range(10000):
 		reward1, reward2 = agent.update_policy(env)
 		print(f"Episode {episode} - REINFORCE: {reward1} , ACTOR_CRITIC: {reward2}")
 		rewards_reinforce.append(reward1)
