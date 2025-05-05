@@ -47,11 +47,15 @@ def main():
     #
 
 	reward_list_reinforce = []
+	save_path = "/content/drive/MyDrive/reinforce_rewards.pkl"
 
 	for episode in range(args.n_episodes):
 		reward1 = agent.update_policy(env)
 		print(f"Episode {episode} - REINFORCE: {reward1}")
 		reward_list_reinforce.append(reward1)
+		
+		with open(save_path, 'wb') as f:
+			pickle.dump(reward_list_reinforce, f)
 	# 	done = False
 	# 	train_reward = 0
 	# 	state = env.reset()  # Reset the environment and observe the initial state
@@ -70,13 +74,6 @@ def main():
 	# 	if (episode+1)%args.print_every == 0:
 	# 		print('Training episode:', episode)
 	# 		print('Episode return:', train_reward)
-
-
-	# Save with pickle
-	with open('rewards.pkl', 'wb') as f:
-		pickle.dump({
-			'reinforce': reward_list_reinforce
-		}, f)
 
 	#torch.save(agent.policy.state_dict(), "model.mdl")
 

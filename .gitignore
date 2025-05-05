@@ -10,3 +10,4 @@ miniforge.sh
 .DS_Store
 MUJOCO_LOG.TXT
 mjkey.txt
+.vscode/settings.json

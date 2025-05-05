@@ -250,6 +250,61 @@ class Agent(object):
         return episode_reward
 
 
+    def PPO(self, env, maxSteps=10000):
+        done = False
+        state = env.reset()
+        steps = 0
+        episode_reward = 0
+
+        ### 1. collect trajectory (experience)
+        while not done and steps < maxSteps:
+            state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.train_device)
+            distribution = self.policy(state_tensor)
+            action = distribution.sample()
+            action_log_prob = distribution.log_prob(action).sum()
+
+            V_s = self.policy.critic_forward(state_tensor)
+
+            next_state, reward, done, _ = env.step(action.cpu().numpy())
+
+            # Store the outcome of the stocastic astion and corresponding reward and value fnunction
+            self.states.append(state_tensor)
+            self.actions.append(action)
+            self.action_log_probs.append(action_log_prob)
+            self.rewards.append(reward)
+            self.done.append(done)
+            self.values.append(V_s)
+
+            state = next_state
+            steps += 1
+            episode_reward += reward
+
+        ### 2. evaluate the trajectory (experience)
+        #   -> we want to calculate 
+        #       A_{t} = r + \gamma*V(s+1) - V(s)
+
+        #   2.1. compute gamma*V(s+1)
+        returns = []
+        V_s_next = self.policy.critic_forward(next_state_tensor).detach()
+        for r, d in zip(reversed(self.rewards), reversed(self.done)):
+            V_s_next = r + self.gamma * V_s_next * (1-d)
+            returns.insert(0, V_s_next)
+
+        #   2.2. compute tensors
+        next_state_tensor = torch.FloatTensor(next_state).unsqueeze(0).to(self.train_device)
+        returns_tensor = torch.FloatTensor(returns).unsqueeze(1).to(self.train_device)
+        values_tensor = torch.cat(self.values)
+
+        #   2.3. compute advantage and normalize it
+        advantage = returns_tensor - values_tensor
+        advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-8)
+
+
+        ### 3. Calculate improvement with clipping (Heart of PPO <3)
+        
+
+            
+
 
     def get_action(self, state, evaluation=False):
         """ state -> action (3-d), action_log_densities """
