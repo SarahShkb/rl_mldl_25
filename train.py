@@ -65,8 +65,9 @@ def main():
 	for episode in range(100000):
 		reward1, reward2 = agent.update_policy(env)
 		print(f"Episode {episode} - REINFORCE: {reward1} , ACTOR_CRITIC: {reward2}")
-		rewards_reinforce.append(rewards_reinforce)
-		rewards_actor_critic.append(rewards_actor_critic)
+		rewards_reinforce.append(reward1)
+		rewards_actor_critic.append(reward2)
+
 		
 		with open(save_path, 'wb') as f:
 			pickle.dump({
